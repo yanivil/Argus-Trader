@@ -58,8 +58,8 @@ The daily production cycle runs deterministically post-market close between 5:58
 
 - **Provider:** Polygon.io Consolidated Tape (SIP) via Developer/Starter tier.
 - **Endpoint:** Grouped Daily Bars (`/v2/aggs/grouped/locale/us/market/stocks/{date}`).
-- **Window:** 5-year rolling history covering ~1,000 liquid equities (> $10 share price,
-  > 1M average daily volume), plus index benchmarks (SPY, QQQ, VIX).
+- **Window:** 5-year rolling history covering ~1,000 liquid equities (>$10 share price, >1M
+  average daily volume), plus index benchmarks (SPY, QQQ, VIX).
 
 ### Partitioning & GitHub Storage Strategy
 

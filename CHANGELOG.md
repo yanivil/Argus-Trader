@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned §2 wording with the PDF ("via Developer/Starter tier", "safely below GitHub limits")
   and §4.2's coordinate-pair bullet.
 
+- Corrected the §2 Window bullet in `docs/design/phase-1-product-design.md`, where a line wrap
+  placed `>` at the start of a continuation line. CommonMark reads that as a blockquote, so the
+  sentence rendered split across a quoted block. The thresholds now read `>$10` and `>1M`
+  unbroken, matching the PDF, and the bullet renders as one sentence.
+
 ### Changed
 
 - `README.md` — expanded from a one-line description to a project-status summary, a
