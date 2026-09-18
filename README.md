@@ -7,7 +7,7 @@ performance regression gates.
 ## Project status
 
 **Phase 1 — Design.** The architecture is specified; no implementation code exists in this
-repository yet. The repository currently contains documentation only.
+repository yet.
 
 ## Documentation
 
@@ -36,11 +36,3 @@ The daily production cycle runs deterministically post-market close, 5:58 PM ET 
 7. **Publication.** JSON artifacts plus a static Jinja2-rendered GitHub Pages dashboard.
 
 See the design document for the full specification.
-
-## Open items before implementation
-
-Implementation is blocked on the items tracked in
-[Appendix A](docs/design/phase-1-product-design.md#appendix-a--unspecified-parameters-in-this-draft)
-and [§12](docs/design/phase-1-product-design.md#12-open-pre-implementation-decisions) of the
-design document — most critically the **position sizing formula (§6.2)**, which the current
-draft leaves undefined.
