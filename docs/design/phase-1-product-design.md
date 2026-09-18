@@ -56,7 +56,7 @@ The daily production cycle runs deterministically post-market close between 5:58
 
 ### Data Source
 
-- **Provider:** Polygon.io Consolidated Tape (SIP) via the Developer/Starter tier.
+- **Provider:** Polygon.io Consolidated Tape (SIP) via Developer/Starter tier.
 - **Endpoint:** Grouped Daily Bars (`/v2/aggs/grouped/locale/us/market/stocks/{date}`).
 - **Window:** 5-year rolling history covering ~1,000 liquid equities (> $10 share price,
   > 1M average daily volume), plus index benchmarks (SPY, QQQ, VIX).
@@ -69,7 +69,7 @@ compressed with Snappy and partitioned quarterly:
 - **Format:** Columnar Apache Parquet (`.parquet`).
 - **Path Schema:** `data/raw/polygon/{YYYY}/{YYYY}_Q{1-4}.parquet`
 - **Quarter Volume:** ~63 trading sessions per quarter × ~1,000 tickers ≈ 63,000 rows.
-- **Storage Footprint:** ~8 MB to 12 MB per partition file (well within GitHub limits).
+- **Storage Footprint:** ~8 MB to 12 MB per partition file (safely below GitHub limits).
 
 ## 3. Tier 0: Macro Regime Circuit Breaker
 
@@ -100,9 +100,12 @@ logic.
 Swing pivots are calculated via volatility-adjusted price reversals rather than fixed-width time
 windows:
 
+```
+Reversal Threshold = 1.5 × ATR14
+```
+
 - Guarantees alternating Peak → Trough → Peak sequence.
-- Extracts exact `(x, y)` coordinate pairs `(Date, Price)` to feed Tier 2 geometric pattern
-  agents.
+- Extracts exact (Date, Price) coordinate pairs to feed Tier 2 geometric pattern agents.
 
 ### 3. Setup Archetypes & Scoring
 
@@ -166,6 +169,11 @@ an adversarial debate.
 - **Bear Agent:** Attacks structural flaws, overhead resistance, and sector headwinds, returning
   an objection risk score (R_Bear ∈ [0, 100]).
 - **Executive Decision Agent:** Approves trade tickets only when:
+
+  ```
+  E_Net = C_Bull - R_Bear ≥ 25   where   C_Bull ≥ 75   and   R_Bear < 50
+  ```
+
   - **Reward-to-Risk Hurdle:** Minimum 2.0:1 calculated strictly against structural invalidation
     points.
 
@@ -198,6 +206,13 @@ artifacts/agents_data/
   - Yellow Regime: 0.5% total equity risk per trade.
   - Red Regime: 0.0% (all new orders blocked).
 - **Position Sizing Formulas:**
+
+  ```
+  Total Dollar Risk = Account Equity × Risk Percentage
+  Risk Per Share    = Entry Limit (X) - Stop Loss (Z)
+  Shares to Buy     = ⌊ Total Dollar Risk / Risk Per Share ⌋
+  ```
+
 - **Concentration Boundaries:**
   - **Max Position Cap:** No single position may exceed 20% of total account equity, regardless
     of how tight the stop loss is.

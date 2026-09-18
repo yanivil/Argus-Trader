@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taxonomy (§9), CI/CD backtest regression gates (§10), the target repository layout (§11), and
   open pre-implementation decisions (§12).
 
+- `docs/design/argus_trader_phase1_design.pdf` — the authored PDF of the Phase 1 design,
+  committed as the source of record for the Markdown transcription.
+
+### Fixed
+
+- Restored three formula blocks to `docs/design/phase-1-product-design.md` that were absent from
+  the text originally transcribed into the repository. Verified against the authored PDF:
+  - §4.2 ZigZag reversal threshold: `Reversal Threshold = 1.5 × ATR14`.
+  - §5 Executive Decision Agent net-edge gate: `E_Net = C_Bull - R_Bear >= 25 where C_Bull >= 75
+    and R_Bear < 50`. Only the `>= 25` component was previously present, and only in the §1
+    pipeline diagram.
+  - §6 position sizing: total dollar risk, risk per share, and the floored share count.
+- Aligned §2 wording with the PDF ("via Developer/Starter tier", "safely below GitHub limits")
+  and §4.2's coordinate-pair bullet.
+
 ### Changed
 
 - `README.md` — expanded from a one-line description to a project-status summary, a

@@ -14,6 +14,7 @@ repository yet.
 | Document | Purpose |
 |---|---|
 | [`docs/design/phase-1-product-design.md`](docs/design/phase-1-product-design.md) | Phase 1 Product Design Document — the design of record: daily batch pipeline, data layer, Tier 0/1/2 engines, governance, risk model, order state machine, dashboard, audit engine, and CI/CD regression gates. |
+| [`docs/design/argus_trader_phase1_design.pdf`](docs/design/argus_trader_phase1_design.pdf) | Authored PDF of the Phase 1 design — the source of record the Markdown version is transcribed from. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, Keep a Changelog format. |
 
 ## Architecture at a glance
