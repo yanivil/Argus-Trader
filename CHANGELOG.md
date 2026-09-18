@@ -17,14 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   machine and CLI specification (§7), the GitHub Pages dashboard (§8), the retrospective audit
   taxonomy (§9), CI/CD backtest regression gates (§10), the target repository layout (§11), and
   open pre-implementation decisions (§12).
-- Appendix A to the design document, recording two gaps found in the source draft: the missing
-  position-sizing formula, and the `E_Net >= 25` executive gate threshold recovered by
-  cross-reference from the §1 pipeline diagram.
 
 ### Changed
 
 - `README.md` — expanded from a one-line description to a project-status summary, a
-  documentation index, an architecture overview, and a pointer to the open pre-implementation
-  items.
+  documentation index, and an architecture overview.
 
 [Unreleased]: https://github.com/yanivil/Argus-Trader/compare/main...HEAD
