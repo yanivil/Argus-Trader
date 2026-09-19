@@ -1,0 +1,43 @@
+# =============================================================================
+# Dependabot — docs/git-hardening-guidelines.md §5.1.
+#
+# Two ecosystems, both weekly.
+#
+# `github-actions` is the one that matters most here, and it is the direct
+# counterpart to §4.2: pinning every action to a commit SHA freezes the
+# supply chain, which also freezes it at whatever vulnerabilities that commit
+# carried. Pinning without this file trades a supply-chain risk for an
+# unpatched-dependency risk. Dependabot is what opens the PR that moves the
+# pin forward, with the new SHA and the release notes attached.
+#
+# `pip` no-ops until requirements.txt exists (design §11). It is configured
+# now so it starts the moment the first dependency lands, rather than being
+# remembered later.
+#
+# Dependabot security updates are a separate repository setting
+# (Settings -> Code security); this file adds routine version-update PRs on
+# top of them. See guidelines §8.
+# =============================================================================
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # The CI `pr-quality` job holds every PR title to Conventional Commits,
+    # because with squash merging the title becomes the commit on main. Setting
+    # the prefix explicitly makes Dependabot's titles conform by construction
+    # instead of relying on its style auto-detection, which reads recent commit
+    # history and can change as that history changes.
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"

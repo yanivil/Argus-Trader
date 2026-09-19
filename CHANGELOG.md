@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/git-hardening-guidelines.md` — the repository git standard, distilled from the controls
+  already in force across the other seven repositories in this account (`SignalSync`, `TASE-125`,
+  `travel-planner`, `capital-intelligence-network`, `family-finance-organizer`, `referent-ai`,
+  `STRIKE`). Covers branch and merge discipline (§1), commit and pull request conventions (§2),
+  guarding `main` (§3), workflow hardening (§4), supply chain (§5), secret and data hygiene (§6),
+  documentation in lockstep (§7), the server-side settings that cannot be committed (§8), a
+  conformance matrix across all eight repositories (§9), and the adoption checklist (§10). Each
+  rule names the repository it was taken from.
+
+- `CONTRIBUTING.md` — the practical working agreement: branch naming, the four-section pull
+  request body, Conventional Commits titles, squash merging, the no-direct-push and
+  no-force-push rules, red-to-green bug fixes, and the secret and dependency rules.
+
+- `SECURITY.md` — credential posture (Argus-Trader is not zero-credential: Polygon.io and an LLM
+  provider are both keyed, and the design tracks order and position state in a public
+  repository), private vulnerability reporting, the in/out-of-scope boundary, and an explicit
+  split between the controls in force and the repository settings not yet enabled.
+
+- `.gitignore` — the repository had none. Excludes credentials by pattern rather than by
+  filename, plus local scratch, Python environments, caches, logs, and editor noise. Records in
+  comments that `data/`, `artifacts/`, `test_results/` and `docs/index.html` are deliberately
+  tracked, per design §10 and §11.
+
+- `.github/pull_request_template.md` — the four sections CI requires (Context / Why, Summary of
+  Changes, Test Steps, Doc Impact), the review checklist, and the bug-fix escape analysis.
+
+- `.github/workflows/ci.yml` — the pull request gate. `pr-quality` checks the Conventional
+  Commits title and the four required body sections; `changelog` requires a `CHANGELOG.md` entry
+  unless the PR carries the `skip-changelog` label; `tests` becomes the merge gate once `src/`
+  and `tests/` land and reports honestly until then; `audit` runs `pip-audit` advisorily once
+  `requirements.txt` exists. Actions are pinned to commit SHAs verified against upstream, every
+  job sets a timeout, permissions start from `contents: read`, and untrusted pull request text
+  reaches every script through `env` rather than interpolation.
+
+- `.github/workflows/main-guard.yml` — a tripwire that opens an incident issue for any push to
+  `main` not associated with a merged pull request, and for any force-push. Ported from
+  `referent-ai`, rewritten to use the preinstalled `gh` CLI so it depends on no third-party
+  action. Exempts `github-actions[bot]`, which is the identity the future daily batch must
+  commit under.
+
+- `.github/dependabot.yml` — weekly `github-actions` and `pip` update PRs, with explicit
+  Conventional Commits prefixes so Dependabot's titles satisfy the `pr-quality` gate by
+  construction rather than by its style auto-detection.
+
 - `docs/design/phase-1-product-design.md` — Phase 1 Product Design Document, the pre-implementation
   design of record. Covers the daily batch pipeline (§1), Polygon SIP data layer and quarterly
   Parquet partitioning (§2), the Tier 0 macro regime circuit breaker (§3), the Tier 1 algorithmic
@@ -42,5 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `README.md` — expanded from a one-line description to a project-status summary, a
   documentation index, and an architecture overview.
+
+- `README.md` — documentation index now lists the guidelines, contributing guide and security
+  policy; added a Contributing section with the CI job table and the public-repository warning.
 
 [Unreleased]: https://github.com/yanivil/Argus-Trader/compare/main...HEAD
