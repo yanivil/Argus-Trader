@@ -1,0 +1,102 @@
+# =============================================================================
+# Main guard — the tripwire on `main`.
+#
+# Standard: docs/git-hardening-guidelines.md §3.2.
+#
+# Why this exists even though `Argus-Trader` is public and can therefore have a
+# branch ruleset: a ruleset is the primary control, but a repository admin can
+# bypass one, and a bypass leaves no standing record. This workflow is what
+# makes it visible afterwards. Any push to `main` whose head commit is not
+# associated with a merged pull request — and any force-push — opens an
+# incident issue naming the actor, the compare link and the commits.
+#
+# Ported from referent-ai/.github/workflows/main-guard.yml, which exists for a
+# different reason: that repository is private, and branch protection is not
+# available on private repositories on the GitHub Free plan, so there the
+# tripwire is the only control. The port drops `actions/github-script` for the
+# `gh` CLI preinstalled on the runner, so the tripwire depends on no
+# third-party action at all and has nothing to keep pinned (§4.2).
+#
+# Note on the daily batch (design §11): it commits the dashboard back to
+# `main`, and it must do so as `github-actions[bot]` — the job-level `if`
+# below exempts exactly that actor. A batch job committing under a human
+# identity would raise a false incident every morning.
+# =============================================================================
+name: Main guard
+
+on:
+  push:
+    branches: [main]
+
+# §4.1 — read the repository and its pull requests; write nothing but an issue.
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  verify-push:
+    name: Verify push came from a merged PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5              # §4.3
+    if: github.actor != 'github-actions[bot]'
+    env:
+      # §4.4 — every value the script reads arrives as an environment
+      # variable. A branch or commit message is attacker-controlled on a public
+      # repository and must never be interpolated into the script body.
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      HEAD_SHA: ${{ github.event.after }}
+      FORCED: ${{ github.event.forced }}
+      ACTOR: ${{ github.actor }}
+      COMPARE_URL: ${{ github.event.compare }}
+    steps:
+      - name: Classify the push
+        run: |
+          set -euo pipefail
+
+          problems=""
+
+          if [[ "$FORCED" == "true" ]]; then
+            problems="${problems}- This was a **force-push** — \`main\` history was rewritten."$'\n'
+          fi
+
+          # The commits-to-PRs endpoint is the authoritative answer to "did
+          # this arrive through a merged PR". An empty result means the commit
+          # reached main some other way.
+          merged_prs=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" \
+                         --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | length')
+
+          if [[ "$merged_prs" -eq 0 ]]; then
+            problems="${problems}- The head commit is **not associated with any merged pull request** — this looks like a direct push."$'\n'
+          fi
+
+          short="${HEAD_SHA:0:7}"
+
+          if [[ -z "$problems" ]]; then
+            echo "Push $short verified: arrived through a merged pull request."
+            exit 0
+          fi
+
+          # Fetch the commit subjects for the incident body. `--jq` keeps the
+          # untrusted message text out of any shell expansion.
+          commit_list=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA" \
+                          --jq '"- `" + .sha[0:7] + "` " + (.commit.message | split("\n")[0])' \
+                        || printf -- '- `%s`' "$short")
+
+          {
+            printf '**Actor:** @%s\n' "$ACTOR"
+            printf '**Compare:** %s\n\n' "$COMPARE_URL"
+            printf '**Findings:**\n%s\n' "$problems"
+            printf '**Head commit:**\n%s\n\n' "$commit_list"
+            printf -- '---\n'
+            printf 'The working agreement (CONTRIBUTING.md, and guidelines §1.1) is that every change to `main` lands through a pull request with green CI. This issue is a **P1: revert first, discuss after**.\n\n'
+            printf 'If the push was a mistake, open a revert PR now (`git revert` on a branch, then a PR). If it was a deliberate emergency fix, say so here and backfill a PR with tests.\n'
+          } > incident.md
+
+          gh issue create \
+            --title "🚨 Unreviewed push to main ($short) by @$ACTOR" \
+            --body-file incident.md
+
+          echo "::error::Unreviewed push to main detected — incident issue opened."
+          exit 1

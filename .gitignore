@@ -1,0 +1,105 @@
+# =============================================================================
+# Argus-Trader — .gitignore
+#
+# Standard: docs/git-hardening-guidelines.md §6.2 (exclude secrets by pattern,
+# not by filename) and §6.3 (name the data class and the reason, so the file
+# records the decision and not just the effect).
+#
+# This repository is PUBLIC. Git history is not a delete-capable store: a
+# credential that is pushed must be rotated, not removed. Everything in the
+# first section is therefore excluded by pattern, so a file nobody anticipated
+# is still caught by shape.
+#
+# Deliberately NOT ignored — the Phase 1 design (§11) tracks these in git:
+#   data/raw/polygon/       quarterly Parquet partitions, sized to stay under
+#                           GitHub's per-file limit precisely so they can be
+#                           committed
+#   data/*.json             order and position state, the audit ledger
+#   artifacts/agents_data/  the daily serialized agent outputs
+#   test_results/           the performance baseline the CI regression gate
+#                           compares candidates against
+#   docs/index.html         the dashboard the publish step commits and Pages
+#                           serves
+# If that changes, change it here and in the design document together.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Secrets and credentials
+#
+# Argus-Trader depends on two paid, keyed services — Polygon.io for market data
+# and the LLM provider behind the Tier 2 committee — so a leak here costs money
+# as well as access. Patterns, not names, for the reason above.
+# -----------------------------------------------------------------------------
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*.token
+*secrets*
+*credentials*
+credentials.json
+client_secret*.json
+
+# -----------------------------------------------------------------------------
+# Local scratch and personal data
+#
+# Brokerage statements, account exports and real position files are used
+# locally during development and must never reach a public repository. They go
+# under local/, which is excluded wholesale so no individual filename has to be
+# anticipated.
+# -----------------------------------------------------------------------------
+local/
+
+# -----------------------------------------------------------------------------
+# Python environments and bytecode
+# -----------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# -----------------------------------------------------------------------------
+# Test, lint and coverage artifacts
+#
+# Backtest runs under test_results/{DATE}_PR-{ID}_{SHA}/ are committed on
+# purpose (design §10) — these are the tool caches around them, which are not.
+# -----------------------------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# -----------------------------------------------------------------------------
+# Runtime logs and process state
+#
+# The daily batch writes logs and pid files next to the code it runs; neither
+# belongs in a diff.
+# -----------------------------------------------------------------------------
+logs/
+*.log
+*.pid
+
+# -----------------------------------------------------------------------------
+# Editor, agent and OS noise
+# -----------------------------------------------------------------------------
+.claude/
+.idea/
+.vscode/
+.DS_Store
+._*
+Thumbs.db

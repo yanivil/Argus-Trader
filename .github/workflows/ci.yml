@@ -1,0 +1,225 @@
+# =============================================================================
+# CI — the pull request gate.
+#
+# Standard: docs/git-hardening-guidelines.md §2 (commit and PR conventions),
+# §4 (workflow hardening), §5.3 (dependency audit), §7.1 (changelog).
+#
+# Three required jobs and one advisory one. `pr-quality` and `changelog` are
+# the conventions from §2.1, §2.2 and §7.1 made non-optional: a rule only a
+# reviewer enforces is a rule that lapses the first time a reviewer is in a
+# hurry. `tests` is the real gate the moment implementation code lands, and
+# reports honestly until then rather than passing silently. `audit` reports
+# CVEs without blocking an unrelated merge (§5.3).
+#
+# Why no client-side hooks: nothing in this account uses husky, lefthook or
+# pre-commit, and a check a contributor can skip with `--no-verify` is not a
+# check. Enforcement lives here, server-side, where it cannot be bypassed
+# without leaving a record.
+# =============================================================================
+name: CI
+
+on:
+  # `edited` matters: the title and body are what `pr-quality` inspects, and
+  # they change without any new commit.
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+# §4.1 — least privilege. Nothing here writes to the repository; the two jobs
+# that call the API need only to read pull request metadata.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # §2.1 + §2.2 — the PR title becomes the squash commit on `main`, so it is
+  # held to Conventional Commits; the body must carry the four sections that
+  # make the change legible to a reader who was not in the room.
+  #
+  # Needs no checkout: everything it inspects is in the event payload.
+  # ---------------------------------------------------------------------------
+  pr-quality:
+    name: PR title & description
+    runs-on: ubuntu-latest
+    timeout-minutes: 5               # §4.3
+    steps:
+      - name: Title follows Conventional Commits
+        # §4.4 — the title is attacker-controlled on a public repository. It is
+        # passed through `env` and read as a shell variable so its content can
+        # never be parsed as script.
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          regex='^(feat|fix|docs|test|refactor|perf|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ "$TITLE" =~ $regex ]]; then
+            echo "Title OK: $TITLE"
+          else
+            echo "::error::PR title must follow Conventional Commits — 'type(scope): summary', e.g. 'feat(tier1): ATR-adaptive ZigZag extrema'. This repository squash-merges, so the title becomes the commit message on main."
+            exit 1
+          fi
+
+      - name: Description has the four required sections
+        # Dependabot writes its own body (the changelog and commit range of the
+        # bumped package) and cannot fill a template. Blocking it here would
+        # make the §5.1 update stream unmergeable and quietly defeat the point
+        # of running Dependabot at all. Its *title* is still checked above, and
+        # .github/dependabot.yml pins the prefix so that check passes by
+        # construction rather than by Dependabot's style auto-detection.
+        if: github.actor != 'dependabot[bot]'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          missing=""
+          # The headings already used on PRs #1-#4. Matched with grep -F so the
+          # slash in "Context / Why" is never read as a regex.
+          for section in "## Context / Why" "## Summary of Changes" "## Test Steps" "## Doc Impact"; do
+            grep -qF "$section" <<< "$BODY" || missing="${missing}  - ${section}"$'\n'
+          done
+          if [[ -n "$missing" ]]; then
+            echo "::error::PR description is missing required section(s). Fill in the template at .github/pull_request_template.md."
+            printf '%s' "$missing"
+            exit 1
+          fi
+          echo "Description OK — all four sections present."
+
+  # ---------------------------------------------------------------------------
+  # §7.1 — the changelog entry ships in the same PR as the change, not in a
+  # tidy-up afterwards. Two exemptions, both deliberate:
+  #   * Dependabot cannot edit CHANGELOG.md, and blocking its PRs would make
+  #     the §5.1 update stream unmergeable.
+  #   * A human can apply the `skip-changelog` label when an entry genuinely
+  #     does not apply. The label is visible on the PR, so the exemption is a
+  #     recorded decision rather than a silent one.
+  # ---------------------------------------------------------------------------
+  changelog:
+    name: CHANGELOG entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.actor != 'dependabot[bot]'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: A changed CHANGELOG.md ships with the change
+        run: |
+          set -euo pipefail
+
+          if gh api "repos/$GH_REPO/pulls/$PR_NUMBER" --jq '.labels[].name' \
+               | grep -qx 'skip-changelog'; then
+            echo "Label 'skip-changelog' present — exempt."
+            exit 0
+          fi
+
+          files=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename')
+
+          if [[ -z "$files" ]]; then
+            echo "PR changes no files — nothing to record."
+            exit 0
+          fi
+
+          if grep -qx 'CHANGELOG.md' <<< "$files"; then
+            echo "CHANGELOG.md updated in this PR."
+            exit 0
+          fi
+
+          echo "::error::This PR changes files but not CHANGELOG.md. Add an entry under [Unreleased] (Keep a Changelog format), or apply the 'skip-changelog' label if one genuinely does not apply."
+          echo "Changed files:"
+          sed 's/^/  - /' <<< "$files"
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # The real merge gate once code exists. Until then it reports what it found
+  # instead of passing quietly, so "green" never means "nothing was checked".
+  #
+  # Replace the detection block with the project's own toolchain — pinned
+  # versions, real lint and coverage steps — when src/ and tests/ land per
+  # design §11.
+  # ---------------------------------------------------------------------------
+  tests:
+    name: Lint & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # §4.2 — pinned to a full commit SHA, verified against upstream:
+      #   git ls-remote --tags https://github.com/actions/checkout | grep v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          # Pin the interpreter alongside the dependencies: a minor bump can
+          # change numpy/pandas resolution under the hood.
+          python-version: "3.12"
+
+      - name: Install and run the suite, if there is one yet
+        run: |
+          set -euo pipefail
+
+          if [[ ! -d src && ! -d tests && ! -f requirements.txt ]]; then
+            echo "No implementation code yet — src/, tests/ and requirements.txt are all absent."
+            echo "This job becomes the merge gate as soon as they land (see design §11)."
+            exit 0
+          fi
+
+          if [[ -f requirements.txt ]]; then
+            # §5.2 — once requirements.txt is a `pip-compile --generate-hashes`
+            # output, install with the hash check enforced. Detected rather
+            # than assumed, so this step is correct both before and after that
+            # switch.
+            if grep -q -- '--hash=sha256:' requirements.txt; then
+              echo "Hash-pinned requirements detected — installing with --require-hashes."
+              pip install --require-hashes -r requirements.txt
+            else
+              echo "::warning::requirements.txt is not hash-pinned. Regenerate it with 'pip-compile --generate-hashes' (guidelines §5.2)."
+              pip install -r requirements.txt
+            fi
+          fi
+
+          if [[ -f requirements-dev.txt ]]; then
+            if grep -q -- '--hash=sha256:' requirements-dev.txt; then
+              pip install --require-hashes -r requirements-dev.txt
+            else
+              pip install -r requirements-dev.txt
+            fi
+          fi
+
+          if command -v ruff >/dev/null 2>&1; then
+            ruff check .
+          else
+            echo "ruff not installed — skipping lint (add it to requirements-dev.txt)."
+          fi
+
+          if [[ -d tests ]]; then
+            pip install --quiet pytest
+            python -m pytest -q
+          else
+            echo "::warning::Code is present but tests/ is not. Tests ship with the code (guidelines §2.3)."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # §5.3 — a CVE in a transitive dependency should surface on its own check,
+  # not block an unrelated merge. Kept out of the required set in §8 for that
+  # reason; a failure here is read, not merged past silently.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: Dependency audit (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Audit pinned dependencies
+        run: |
+          set -euo pipefail
+          if [[ ! -f requirements.txt ]]; then
+            echo "No requirements.txt yet — nothing to audit."
+            exit 0
+          fi
+          pip install --quiet pip-audit
+          pip-audit -r requirements.txt --desc on
